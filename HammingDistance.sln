@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2041
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HammingDistance", "HammingDistance\HammingDistance.vcxproj", "{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HammingDistance.CUDA", "HammingDistance.CUDA\HammingDistance.CUDA.vcxproj", "{0FE1D197-90E0-4BF6-83BF-081CE2D21C25}"
 EndProject
 Global
@@ -15,14 +13,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Debug|x64.ActiveCfg = Debug|x64
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Debug|x64.Build.0 = Debug|x64
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Debug|x86.ActiveCfg = Debug|Win32
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Debug|x86.Build.0 = Debug|Win32
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Release|x64.ActiveCfg = Release|x64
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Release|x64.Build.0 = Release|x64
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Release|x86.ActiveCfg = Release|Win32
-		{BDC7B128-05BB-4A90-82ED-FE1413DF7C33}.Release|x86.Build.0 = Release|Win32
 		{0FE1D197-90E0-4BF6-83BF-081CE2D21C25}.Debug|x64.ActiveCfg = Debug|x64
 		{0FE1D197-90E0-4BF6-83BF-081CE2D21C25}.Debug|x64.Build.0 = Debug|x64
 		{0FE1D197-90E0-4BF6-83BF-081CE2D21C25}.Debug|x86.ActiveCfg = Debug|x64
