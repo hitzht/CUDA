@@ -12,11 +12,20 @@
 #include <memory>
 #include <functional>
 
+#include<stdio.h>
+#include<cuda.h>
+#include<cuda_runtime.h>
+#include<device_launch_parameters.h>
+#include<conio.h>
+
+
 using namespace std;
 
-#define N 100000LL //rozmiar ci¹gu binarnergo
-#define M 1000LL //iloœæ tablic binarnych
+#define N 10000 //rozmiar ci¹gu binarnergo
+#define M 100 //iloœæ tablic binarnych
 #define DIST 2 //szukany dystans
+#define BLOCKSIZE_x 16
+#define BLOCKSIZE_y 16
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
@@ -25,6 +34,20 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 	{
 		fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
 		if (abort) exit(code);
+	}
+}
+
+int iDivUp(int hostPtr, int b) { return ((hostPtr % b) != 0) ? (hostPtr / b + 1) : (hostPtr / b); }
+
+__global__ void cudaHammingDistance2d(bool *devPtr, size_t pitch)
+{
+	int tidx = blockIdx.x*blockDim.x + threadIdx.x;
+	int tidy = blockIdx.y*blockDim.y + threadIdx.y;
+
+	if ((tidx < N) && (tidy < M))
+	{
+		/*float *row_a = (float *)((char*)devPtr + tidy * pitch);
+		row_a[tidx] = row_a[tidx] * tidx * tidy;*/
 	}
 }
 
@@ -103,8 +126,39 @@ __host__ bool CpuHammingDistance2d(bool **bitArrays)
 	return returnFlag;
 }
 
-__host__ bool GpuHammingDistance2d(bool **bitArrays)
+__host__ bool GpuHammingDistance2d(bool **sss)
 {
+	bool bitArrays[M][N];
+	bool *d_bitArrays;
+	size_t pitch;
+
+	for (int i = 0; i < M; i++)
+		for (int j = 0; j < N; j++) {
+			bitArrays[i][j] = false;
+			//printf("row %i column %i value %f \n", i, j, hostPtr[i][j]);
+		}
+
+	CUDA_CALL(cudaSetDevice(0));
+	CUDA_CALL(cudaMallocPitch(&d_bitArrays, &pitch, N * sizeof(bool), M));
+	CUDA_CALL(cudaMemcpy2D(d_bitArrays, pitch, bitArrays, N * sizeof(bool), N * sizeof(bool), M, cudaMemcpyHostToDevice));
+	dim3 gridSize(iDivUp(N, BLOCKSIZE_x), iDivUp(M, BLOCKSIZE_y));
+	dim3 blockSize(BLOCKSIZE_y, BLOCKSIZE_x);
+	////size_t free = 0, total = 0;
+	////cudaMemGetInfo(&free, &total);
+	auto start = chrono::high_resolution_clock::now();
+	cudaHammingDistance2d << <gridSize, blockSize >> > (d_bitArrays, pitch);
+
+	// Check for any errors launching the kernel
+	CUDA_CALL(cudaPeekAtLastError());
+
+	// cudaDeviceSynchronize waits for the kernel to finish, and returns
+	// any errors encountered during the launch.
+	CUDA_CALL(cudaDeviceSynchronize());
+
+
+	auto finish = chrono::high_resolution_clock::now();
+	auto milliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
+	cout << "GPU time: " << milliseconds.count() << " milliseconds\n";
 	return true;
 }
 
@@ -125,7 +179,7 @@ __host__ int main()
 	cout << "initialize_arrays time: " << miliseconds.count() << " milliseconds\n";
 	cout << "Arrays length: " << N << " number of arrays: " << M << "\n";
 
-	CpuHammingDistance2d(bitArrays);
+	//CpuHammingDistance2d(bitArrays);
 	GpuHammingDistance2d(bitArrays);
 
 	for (int i = 0; i < M; i++)
