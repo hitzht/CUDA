@@ -92,10 +92,8 @@ __host__ long long GpuHammingDistance(char **strings, const long long length)
 	char *d_w1, *d_w2;
 
 	CUDA_CALL(cudaSetDevice(0));
-	CUDA_CALL(cudaDeviceSynchronize());
-	CUDA_CALL(cudaThreadSynchronize());
-	size_t free = 0, total = 0;
-	cudaMemGetInfo(&free, &total);
+	//size_t free = 0, total = 0;
+	//cudaMemGetInfo(&free, &total);
 	CUDA_CALL(cudaMalloc((void**)&d_w1, length * sizeof(char)));
 	CUDA_CALL(cudaMalloc((void**)&d_w2, length * sizeof(char)));
 	CUDA_CALL(cudaMalloc((void**)&len, sizeof(long long)));

@@ -14,8 +14,8 @@
 
 using namespace std;
 
-#define N 1000000LL //rozmiar ci¹gu binarnergo
-#define M 100LL //iloœæ tablic binarnych
+#define N 100000LL //rozmiar ci¹gu binarnergo
+#define M 1000LL //iloœæ tablic binarnych
 #define DIST 2 //szukany dystans
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -37,23 +37,23 @@ __host__ unsigned int simplerand(void) {
 	return (m_z << 16) + m_w;
 }
 
-__host__ void initialize_arrays(bool** arrays, long long const arrayLength, long long const numberOfArrays, bool randomDistance = false)
+__host__ void initialize_arrays(bool** arrays, bool randomDistance = false)
 {
 	std::minstd_rand gen(std::random_device{}());
 	std::uniform_real_distribution<double> dist(0, 1);
 	if (randomDistance)
-		for (long long i = 0; i < numberOfArrays; ++i)
-			for (long long j = 0; j < arrayLength; ++j)
+		for (long long i = 0; i < M; ++i)
+			for (long long j = 0; j < N; ++j)
 				arrays[i][j] = (((double)simplerand() + UINT_MAX) / UINT_MAX / 2) > 0.5;
 	else
 	{
-		int* indexes = (int*)calloc(numberOfArrays, sizeof(int));
+		int* indexes = (int*)calloc(M, sizeof(int));
 		int ind = 1;
-		while (ind < numberOfArrays)
+		while (ind < M)
 		{
 			bool flag = 0;
-			int rand = (int)((((double)simplerand() + UINT_MAX) / UINT_MAX / 2) * arrayLength);
-			for (int i = 0; i < numberOfArrays; i++)
+			int rand = (int)((((double)simplerand() + UINT_MAX) / UINT_MAX / 2) * N);
+			for (int i = 0; i < M; i++)
 				if (indexes[i] == rand)
 				{
 					flag = 1;
@@ -63,37 +63,37 @@ __host__ void initialize_arrays(bool** arrays, long long const arrayLength, long
 				continue;
 			indexes[ind++] = rand;
 		}
-		for (int i = 0; i < numberOfArrays; i++)
+		for (int i = 0; i < M; i++)
 			arrays[i][indexes[i]] = true;
 		free(indexes);
 	}
 }
 
-__host__ bool CpuHammingDistance2d(bool **bitArrays, const long long arrayLength, const long long numberOfArray, const long long distance)
+__host__ bool CpuHammingDistance2d(bool **bitArrays)
 {
 	bool returnFlag = true;
 	auto start = chrono::high_resolution_clock::now();
-	int** distances = (int**)calloc(numberOfArray, sizeof(int*));
-	for (int i = 0; i < numberOfArray; i++)
-		distances[i] = (int*)calloc(numberOfArray, sizeof(int));
-	for (int i = 0; i < numberOfArray; i++)
-		for (int j = 0; j < numberOfArray; j++)
+	int** distances = (int**)calloc(M, sizeof(int*));
+	for (int i = 0; i < M; i++)
+		distances[i] = (int*)calloc(M, sizeof(int));
+	for (int i = 0; i < M; i++)
+		for (int j = 0; j < M; j++)
 		{
 			if (i == j)
 				break;
-			for (int p = 0; p < arrayLength; p++)
+			for (int p = 0; p < N; p++)
 				if (bitArrays[i][p] != bitArrays[j][p])
 					distances[i][j]++;
 		}
-	for (int i = 0; i < numberOfArray; i++)
-		for (int j = 0; j < numberOfArray; j++)
+	for (int i = 0; i < M; i++)
+		for (int j = 0; j < M; j++)
 		{
 			if (i == j)
 				break;
-			if (distances[i][j] != distance)
+			if (distances[i][j] != DIST)
 				returnFlag = false;
 		}
-	for (int i = 0; i < numberOfArray; i++)
+	for (int i = 0; i < M; i++)
 		free(distances[i]);
 	free(distances);
 	auto finish = chrono::high_resolution_clock::now();
@@ -103,36 +103,32 @@ __host__ bool CpuHammingDistance2d(bool **bitArrays, const long long arrayLength
 	return returnFlag;
 }
 
-__host__ bool GpuHammingDistance2d(bool **bitArrays, const long long arrayLength, const long long numberOfArray, const long long distance)
+__host__ bool GpuHammingDistance2d(bool **bitArrays)
 {
 	return true;
 }
 
 __host__ int main()
 {
-	long long arrayLength = N;
-	long long numberOfArrays = M;
-	long long distance = DIST;
-
 	auto start = chrono::high_resolution_clock::now();
-	bool** bitArrays = (bool**)malloc(numberOfArrays * sizeof(bool*));
-	for (int i = 0; i < numberOfArrays; i++)
-		bitArrays[i] = (bool*)calloc(arrayLength, sizeof(bool));
+	bool** bitArrays = (bool**)malloc(M * sizeof(bool*));
+	for (int i = 0; i < M; i++)
+		bitArrays[i] = (bool*)calloc(N, sizeof(bool));
 	auto finish = chrono::high_resolution_clock::now();
 	auto miliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
 	cout << "Malloc time: " << miliseconds.count() << " milliseconds\n";
 
 	start = chrono::high_resolution_clock::now();
-	initialize_arrays(bitArrays, arrayLength, numberOfArrays, false);
+	initialize_arrays(bitArrays, false);
 	finish = chrono::high_resolution_clock::now();
 	miliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
 	cout << "initialize_arrays time: " << miliseconds.count() << " milliseconds\n";
-	cout << "Arrays length: " << arrayLength << " number of arrays: " << numberOfArrays << "\n";
+	cout << "Arrays length: " << N << " number of arrays: " << M << "\n";
 
-	CpuHammingDistance2d(bitArrays, arrayLength, numberOfArrays, distance);
-	GpuHammingDistance2d(bitArrays, arrayLength, numberOfArrays, distance);
+	CpuHammingDistance2d(bitArrays);
+	GpuHammingDistance2d(bitArrays);
 
-	for (int i = 0; i < numberOfArrays; i++)
+	for (int i = 0; i < M; i++)
 		free(bitArrays[i]);
 	free(bitArrays);
 	return 0;
