@@ -56,6 +56,7 @@ unsigned int simplerand(void) {
 	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
 	return (m_z << 16) + m_w;
 }
+
 __host__ void gen_random_words(char* s1, char* s2, long long len)
 {
 	char alphanum[] =
@@ -124,7 +125,7 @@ __host__ long long GpuHammingDistance(char **strings, const long long length)
 	return microseconds.count();
 }
 
-__host__ long main()
+__host__ int main()
 {
 	long long length = N;
 	char *string[2];
