@@ -4,7 +4,6 @@
 
 #include <string>
 #include <stdio.h>
-
 #include <vector>
 #include <iterator>
 #include <iostream>
@@ -12,7 +11,10 @@
 #include <chrono>
 #include <memory>
 #include <functional>
+
 using namespace std;
+
+#define N 1600000000LL //rozmiar s³ów dla których liczona jest odleg³oœæ hamminga
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
@@ -45,6 +47,7 @@ __host__ long long hammingDistance(char ** strings, const long length)
 	return distance;
 }
 
+
 static int m_w = 17358;
 static int m_z = 341;
 
@@ -53,13 +56,12 @@ unsigned int simplerand(void) {
 	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
 	return (m_z << 16) + m_w;
 }
-__host__ void gen_random(char* s1, char* s2, long long len)
+__host__ void gen_random_words(char* s1, char* s2, long long len)
 {
 	char alphanum[] =
 		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 	std::minstd_rand gen(std::random_device{}());
 	std::uniform_real_distribution<double> dist(0, 1);
-	
 	for (long long i = 0; i < len; ++i) {
 		s1[i] = alphanum[(int)((((double)simplerand() + UINT_MAX) / UINT_MAX / 2) * 62)];
 		s2[i] = alphanum[(int)((((double)simplerand() + UINT_MAX) / UINT_MAX / 2) * 62)];
@@ -99,10 +101,10 @@ __host__ long long GpuHammingDistance(char **strings, const long long length)
 	CUDA_CALL(cudaMemcpy(d_w1, strings[0], length * sizeof(char), cudaMemcpyHostToDevice));
 	CUDA_CALL(cudaMemcpy(d_w2, strings[1], length * sizeof(char), cudaMemcpyHostToDevice));
 	CUDA_CALL(cudaMemcpy(len, &length, sizeof(long long), cudaMemcpyHostToDevice));
-	
+
 	auto start = chrono::high_resolution_clock::now();
-	cudaHammingDistance<<<blockCount, threadCount>>>(d_w1, d_w2, len);
-	
+	cudaHammingDistance << <blockCount, threadCount >> > (d_w1, d_w2, len);
+
 	// Check for any errors launching the kernel
 	CUDA_CALL(cudaGetLastError());
 
@@ -124,8 +126,8 @@ __host__ long long GpuHammingDistance(char **strings, const long long length)
 
 __host__ long main()
 {
+	long long length = N;
 	char *string[2];
-	long long length = 15000000LL;// 00;// 314748364;
 	auto start = chrono::high_resolution_clock::now();
 	string[0] = (char*)malloc(length * sizeof(char));
 	string[1] = (char*)malloc(length * sizeof(char));
@@ -134,15 +136,15 @@ __host__ long main()
 	cout << "Malloc time: " << microseconds.count() << " microseconds\n";
 
 	start = chrono::high_resolution_clock::now();
-	gen_random(string[0], string[1], length);
+	gen_random_words(string[0], string[1], length);
 	finish = chrono::high_resolution_clock::now();
 	microseconds = chrono::duration_cast<chrono::microseconds>(finish - start);
 	cout << "gen_random time: " << microseconds.count() << " microseconds\n";
 	cout << "Length: " << length << "\n";
-	
+
 	CpuHammingDistance(string, length);
 	GpuHammingDistance(string, length);
 	free(string[0]);
 	free(string[1]);
-    return 0;
+	return 0;
 }

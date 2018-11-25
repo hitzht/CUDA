@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2041
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HammingDistance.CUDA", "HammingDistance.CUDA\HammingDistance.CUDA.vcxproj", "{0FE1D197-90E0-4BF6-83BF-081CE2D21C25}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HammingDistance", "HammingDistance\HammingDistance.vcxproj", "{0FE1D197-90E0-4BF6-83BF-081CE2D21C25}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
