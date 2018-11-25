@@ -1,0 +1,4 @@
+// Hlong files help the Visual Studio IDE longerpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define __FILE__
