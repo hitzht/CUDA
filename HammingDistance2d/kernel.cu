@@ -22,7 +22,7 @@
 using namespace std;
 
 #define N 4000 //rozmiar ci¹gu binarnergo
-#define M 2000 //iloœæ tablic binarnych
+#define M 2000 //iloœæ tablic binarnyc h
 #define DIST 2 //szukany dystans
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -35,6 +35,30 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 	}
 }
 
+__global__ void cudaHammingDistance2dEquals1(bool *d_arrays, unsigned long long *d_distances)
+{
+	const long numThreads = blockDim.x * gridDim.x;
+	const long threadID = blockIdx.x * blockDim.x + threadIdx.x;
+	for (int ind = threadID; ind < M * M; ind += numThreads)
+	{
+		int i = ind % M;
+		int j = ind / M;
+		if (i == j)
+			continue;
+		int length 0;
+		
+		for (int p = 0; p < N; p += 1)
+			if (d_arrays[i * N + p] != d_arrays[j * N + p])
+			{
+				if (++length > 1)
+				{
+
+				}
+			}
+	}
+}
+
+
 __global__ void cudaHammingDistance2d(bool *d_arrays, unsigned long long *d_distances)
 {
 	const long numThreads = blockDim.x * gridDim.x;
@@ -44,11 +68,11 @@ __global__ void cudaHammingDistance2d(bool *d_arrays, unsigned long long *d_dist
 		int i = ind % M;
 		int j = ind / M;
 		if (i == j)
-			break;
+			continue;
 		for (int p = 0; p < N; p += 1)
 			if (d_arrays[i * N + p] != d_arrays[j * N + p])
 			{
-				atomicAdd(&d_distances[i * M + j], 1);
+				d_distances[i * M + j]++;
 			}
 	}
 }
@@ -140,7 +164,7 @@ __host__ bool GpuHammingDistance2d(bool *bitArrays)
 	CUDA_CALL(cudaMemcpy(d_bitArrays, bitArrays, M * N * sizeof(bool), cudaMemcpyHostToDevice));
 
 	auto start = chrono::high_resolution_clock::now();
-	cudaHammingDistance2d << <threadCount, blockCount >> > (d_bitArrays, d_distances);
+	cudaHammingDistance2dEquals1<<<threadCount, blockCount>>>(d_bitArrays, d_distances);
 	CUDA_CALL(cudaThreadSynchronize());
 	// Check for any errors launching the kernel
 	CUDA_CALL(cudaGetLastError());
