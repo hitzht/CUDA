@@ -48,7 +48,7 @@ __global__ void cudaHammingDistance2d(bool *d_arrays, unsigned long long *d_dist
 		for (int p = 0; p < N; p += 1)
 			if (d_arrays[i * N + p] != d_arrays[j * N + p])
 			{
-				atomicAdd(&d_distances[0], 1);
+				atomicAdd(&d_distances[i * M + j], 1);
 			}
 	}
 }
