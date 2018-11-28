@@ -22,8 +22,8 @@
 
 using namespace std;
 
-#define N 40 //rozmiar ci¹gu binarnergo
-#define M 15000 //iloœæ tablic binarnyc h
+#define N 300000LL //rozmiar ci¹gu binarnergo
+#define M 10000LL //iloœæ tablic binarnyc h
 #define SHOW_DIFFS true //czy pokazywaæ ró¿nicê miêdzy kolejnymi danymi ci¹gami bitów
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -49,6 +49,8 @@ __global__ void cudaHammingDistance2dEquals1(bool *d_arrays, bool *d_pairs)
 		i = ind % M;
 		j = ind / M;
 		if (i == j)
+			continue;
+		if (j > i)
 			continue;
 		for (int p = 0; p < N; p += 1)
 			if (d_arrays[i * N + p] != d_arrays[j * N + p])
@@ -93,12 +95,9 @@ __host__ unsigned int simplerand(void) {
 	return (m_z << 16) + m_w;
 }
 
-
-
-__host__ void ShowGpuResults(bool *distances, bool *bitArrays)
+__host__ void ShowCpuResults(bool *distances, bool *bitArrays)
 {
 	int pairCount = 0;
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	cout << "All pairs:\n";
 	for (int i = 0; i < M; i++)
 		for (int j = 0; j < M; j++)
@@ -111,7 +110,12 @@ __host__ void ShowGpuResults(bool *distances, bool *bitArrays)
 			}
 		}
 	cout << "\nPair count: " << pairCount << "\n";
+}
 
+__host__ void ShowGpuResults(bool *distances, bool *bitArrays)
+{
+	int pairCount = 0;
+	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	if (SHOW_DIFFS)
 	{
 		for (int i = 0; i < M; i++)
@@ -148,8 +152,20 @@ __host__ void ShowGpuResults(bool *distances, bool *bitArrays)
 				}
 			}
 	}
-}
+	cout << "All pairs:\n";
+	for (int i = 0; i < M; i++)
+		for (int j = 0; j < M; j++)
+		{
+			if (distances[i * M + j])
+			{
+				if (pairCount++ > 0)
+					cout << ", ";
+				cout << "(" << i << ", " << j << ")";
+			}
+		}
+	cout << "\nPair count: " << pairCount << "\n";
 
+}
 
 __host__ void InitializeArrays(bool* arrays, bool randomDistance = false)
 {
@@ -175,73 +191,90 @@ __host__ void InitializeArrays(bool* arrays, bool randomDistance = false)
 	}
 }
 
-__host__ bool CpuHammingDistance2d(bool *bitArrays)
+__host__ void CpuHammingDistance2d(bool *bitArrays)
 {
 	bool returnFlag = true;
 	auto start = chrono::high_resolution_clock::now();
-	int* distances = (int*)calloc(M * M, sizeof(int*));
-	for (int i = 0; i < M; i++)
-		for (int j = 0; j < M; j++)
-			for (int p = 0; p < N; p++)
-				if (bitArrays[i * N + p] != bitArrays[j * N + p])
-					distances[i * M + j]++;
+	bool* pairs = (bool*)calloc(M * M, sizeof(bool));
 	for (int i = 0; i < M; i++)
 		for (int j = 0; j < M; j++)
 		{
-			if (i == j)
+			if (j > i)
 				break;
-			if (distances[i * M + j] != 1)
-				returnFlag = false;
+			bool flag = false;
+			for (int p = 0; p < N; p++)
+				if (bitArrays[i * N + p] != bitArrays[j * N + p])
+					if (!flag)
+						flag = true;
+					else
+					{
+						flag = false;
+						break;
+					}
+			if (flag)
+				pairs[i * M + j] = true;
 		}
-	free(distances);
+
 	auto finish = chrono::high_resolution_clock::now();
 	auto miliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
 	cout << ">>>>>>CpuHammingDistance2d time: " << miliseconds.count() << " milliseconds\n";
-	cout << "Result: " << returnFlag << "\n";
-	return returnFlag;
+	ShowCpuResults(pairs, bitArrays);
+	free(pairs);
 }
 
-__host__ bool GpuHammingDistance2d(bool *bitArrays)
+__host__ void GpuHammingDistance2d(bool *bitArrays)
 {
 	bool returnFlag = true;
 	bool *d_bitArrays;
-	bool *d_distances, *distances = (bool*)malloc(M * M * sizeof(bool));
-	long threadCount = 1024;
-	long blockCount = 1024;
+	bool *d_pairs, *pairs = (bool*)malloc(M * M * sizeof(bool));
+	
+	int blockSize = 1024;      // The launch configurator returned block size 
+	//int minGridSize;    // The minimum grid size needed to achieve the maximum occupancy for a full device launch 
+	int gridSize = 1024;       // The actual grid size needed, based on input size 
+
 	CUDA_CALL(cudaSetDevice(0));
 	//size_t free = 0, total = 0;
 	//cudaMemGetInfo(&free, &total);
+	auto start = chrono::high_resolution_clock::now();
 	CUDA_CALL(cudaMalloc((void**)&d_bitArrays, M * N * sizeof(bool)));
-	CUDA_CALL(cudaMalloc((void**)&d_distances, M * M * sizeof(bool)));
-	CUDA_CALL(cudaMemset(d_distances, 0, M * M));
+	CUDA_CALL(cudaMalloc((void**)&d_pairs, M * M * sizeof(bool)));
+	CUDA_CALL(cudaMemset(d_pairs, 0, M * M));
 	CUDA_CALL(cudaMemcpy(d_bitArrays, bitArrays, M * N * sizeof(bool), cudaMemcpyHostToDevice));
 
-	auto start = chrono::high_resolution_clock::now();
+	//CUDA_CALL(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, cudaHammingDistance2dEquals1, 0, M * M));
+
+	// Round up according to array size 
+	//gridSize = (M * M + blockSize - 1) / blockSize;
+
+
+	auto finish = chrono::high_resolution_clock::now();
+	auto milliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
+	cout << ">>>>>>GpuHammingDistance2d malloc + H2D time: " << milliseconds.count() << " milliseconds\n";
+	start = chrono::high_resolution_clock::now();
 	CUDA_CALL(cudaDeviceSynchronize());
-	cudaHammingDistance2dEquals1 << <threadCount, blockCount >> > (d_bitArrays, d_distances);
+	cudaHammingDistance2dEquals1 << <gridSize, blockSize>> > (d_bitArrays, d_pairs);
 	// Check for any errors launching the kernel
 	CUDA_CALL(cudaPeekAtLastError());
 
 	// cudaDeviceSynchronize waits for the kernel to finish, and returns
 	// any errors encountered during the launch.
 	CUDA_CALL(cudaDeviceSynchronize());
-	CUDA_CALL(cudaMemcpy(distances, d_distances, M * M * sizeof(bool), cudaMemcpyDeviceToHost));
-	CUDA_CALL(cudaFree(d_distances));
+	CUDA_CALL(cudaMemcpy(pairs, d_pairs, M * M * sizeof(bool), cudaMemcpyDeviceToHost));
+	CUDA_CALL(cudaFree(d_pairs));
 	CUDA_CALL(cudaFree(d_bitArrays));
 	CUDA_CALL(cudaDeviceReset());
-	ShowGpuResults(distances, bitArrays);
-	free(distances);
-	auto finish = chrono::high_resolution_clock::now();
-	auto milliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
-	cout << ">>>>>>GpuHammingDistance2d time: " << milliseconds.count() << " milliseconds\n";
-	return true;
+	finish = chrono::high_resolution_clock::now();
+	milliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
+	ShowGpuResults(pairs, bitArrays);
+	free(pairs);
+	cout << ">>>>>>GpuHammingDistance2d algorithm + D2H time: " << milliseconds.count() << " milliseconds\n";
 }
 
 __host__ int main()
 {
 	auto start = chrono::high_resolution_clock::now();
 	//sp³aszczona dwuwymiarowa tablica
-	bool* bitArrays = (bool*)calloc(M * N, sizeof(bool));
+	bool *bitArrays = (bool*)calloc(M * N, sizeof(bool));
 	auto finish = chrono::high_resolution_clock::now();
 	auto miliseconds = chrono::duration_cast<chrono::milliseconds>(finish - start);
 	cout << ">>>>>>malloc time: " << miliseconds.count() << " milliseconds\n";
