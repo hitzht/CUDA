@@ -22,9 +22,9 @@
 
 using namespace std;
 
-#define N 300000LL //rozmiar ci¹gu binarnergo
-#define M 10000LL //iloœæ tablic binarnyc h
-#define SHOW_DIFFS true //czy pokazywaæ ró¿nicê miêdzy kolejnymi danymi ci¹gami bitów
+#define N 50LL //rozmiar ci¹gu binarnergo
+#define M 100000LL //iloœæ tablic binarnyc h
+#define SHOW_DIFFS false //czy pokazywaæ ró¿nicê miêdzy kolejnymi danymi ci¹gami bitów
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
@@ -36,15 +36,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 	}
 }
 
-__device__ unsigned long long counter = 0;
-
 __global__ void cudaHammingDistance2dEquals1(bool *d_arrays, bool *d_pairs)
 {
 	const long numThreads = blockDim.x * gridDim.x;
 	const long threadID = blockIdx.x * blockDim.x + threadIdx.x;
-	int i, j;
+	long long i, j;
 	bool flag = false;
-	for (int ind = threadID; ind < M * M; ind += numThreads)
+	for (long long ind = threadID; ind < M * M; ind += numThreads)
 	{
 		i = ind % M;
 		j = ind / M;
@@ -52,7 +50,7 @@ __global__ void cudaHammingDistance2dEquals1(bool *d_arrays, bool *d_pairs)
 			continue;
 		if (j > i)
 			continue;
-		for (int p = 0; p < N; p += 1)
+		for (long long p = 0; p < N; p += 1)
 			if (d_arrays[i * N + p] != d_arrays[j * N + p])
 				if (flag)
 				{
@@ -72,13 +70,13 @@ __global__ void cudaHammingDistance2d(bool *d_arrays, unsigned long long *d_dist
 {
 	const long numThreads = blockDim.x * gridDim.x;
 	const long threadID = blockIdx.x * blockDim.x + threadIdx.x;
-	for (int ind = threadID; ind < M * M; ind += numThreads)
+	for (long long ind = threadID; ind < M * M; ind += numThreads)
 	{
-		int i = ind % M;
-		int j = ind / M;
+		long long i = ind % M;
+		long long j = ind / M;
 		if (i == j)
 			continue;
-		for (int p = 0; p < N; p += 1)
+		for (long long p = 0; p < N; p += 1)
 			if (d_arrays[i * N + p] != d_arrays[j * N + p])
 			{
 				d_distances[i * M + j]++;
@@ -97,10 +95,10 @@ __host__ unsigned int simplerand(void) {
 
 __host__ void ShowCpuResults(bool *distances, bool *bitArrays)
 {
-	int pairCount = 0;
+	long long pairCount = 0;
 	cout << "All pairs:\n";
-	for (int i = 0; i < M; i++)
-		for (int j = 0; j < M; j++)
+	for (long long i = 0; i < M; i++)
+		for (long long j = 0; j < M; j++)
 		{
 			if (distances[i * M + j])
 			{
@@ -114,18 +112,18 @@ __host__ void ShowCpuResults(bool *distances, bool *bitArrays)
 
 __host__ void ShowGpuResults(bool *distances, bool *bitArrays)
 {
-	int pairCount = 0;
+	long pairCount = 0;
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	if (SHOW_DIFFS)
 	{
-		for (int i = 0; i < M; i++)
-			for (int j = 0; j < M; j++)
+		for (long long i = 0; i < M; i++)
+			for (long long j = 0; j < M; j++)
 			{
 				if (distances[i * M + j])
 				{
 					cout << "Pair: (" << i << ", " << j << ")\n";
 
-					for (int ind = 0; ind < N; ind++)
+					for (long long ind = 0; ind < N; ind++)
 					{
 						if (bitArrays[i * N + ind] == bitArrays[j * N + ind])
 							cout << bitArrays[i * N + ind];
@@ -137,7 +135,7 @@ __host__ void ShowGpuResults(bool *distances, bool *bitArrays)
 						}
 					}
 					cout << "\n";
-					for (int ind = 0; ind < N; ind++)
+					for (long long ind = 0; ind < N; ind++)
 					{
 						if (bitArrays[i * N + ind] == bitArrays[j * N + ind])
 							cout << bitArrays[j * N + ind];
@@ -153,8 +151,8 @@ __host__ void ShowGpuResults(bool *distances, bool *bitArrays)
 			}
 	}
 	cout << "All pairs:\n";
-	for (int i = 0; i < M; i++)
-		for (int j = 0; j < M; j++)
+	for (long long i = 0; i < M; i++)
+		for (long long j = 0; j < M; j++)
 		{
 			if (distances[i * M + j])
 			{
@@ -196,13 +194,13 @@ __host__ void CpuHammingDistance2d(bool *bitArrays)
 	bool returnFlag = true;
 	auto start = chrono::high_resolution_clock::now();
 	bool* pairs = (bool*)calloc(M * M, sizeof(bool));
-	for (int i = 0; i < M; i++)
-		for (int j = 0; j < M; j++)
+	for (long long i = 0; i < M; i++)
+		for (long long j = 0; j < M; j++)
 		{
 			if (j > i)
 				break;
 			bool flag = false;
-			for (int p = 0; p < N; p++)
+			for (long long p = 0; p < N; p++)
 				if (bitArrays[i * N + p] != bitArrays[j * N + p])
 					if (!flag)
 						flag = true;
