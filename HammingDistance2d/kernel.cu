@@ -22,9 +22,9 @@
 
 using namespace std;
 
-#define N 50LL //rozmiar ci¹gu binarnergo
-#define M 50000LL //iloœæ tablic binarnyc h
-#define SHOW_DIFFS false //czy pokazywaæ ró¿nicê miêdzy kolejnymi danymi ci¹gami bitów
+#define N 80LL //rozmiar ci¹gu binarnergo
+#define M 75000LL //iloœæ tablic binarnyc h
+#define SHOW_DIFFS true //czy pokazywaæ ró¿nicê miêdzy kolejnymi danymi ci¹gami bitów
 
 #define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
@@ -36,20 +36,25 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 	}
 }
 
+__host__ __device__ void getTriangleArrayCoordinates(long long ind, long long &i, long long &j)
+{
+	i = (std::ceil(std::sqrt(2 * (ind + 1) + 0.25) - 0.5));
+	j = (ind + 1 - (i - 1) * i / 2);
+	j--;
+	i--;
+}
+
 __global__ void cudaHammingDistance2dEquals1(bool *d_arrays, bool *d_pairs, long long arrayLength, long long numberOfArrays)
 {
 	const long numThreads = blockDim.x * gridDim.x;
 	const long threadID = blockIdx.x * blockDim.x + threadIdx.x;
 	long long i, j;
 	bool flag = false;
-	for (long long ind = threadID; ind < numberOfArrays * numberOfArrays; ind += numThreads)
+	for (long long ind = threadID; ind < numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays; ind += numThreads)
 	{
-		i = ind % numberOfArrays;
-		j = ind / numberOfArrays;
-		if (i == j)
-			continue;
-		if (j > i)
-			continue;
+		getTriangleArrayCoordinates(ind, i, j);
+		if (i == j) continue;
+
 		for (long long p = 0; p < arrayLength; p += 1)
 			if (d_arrays[i * arrayLength + p] != d_arrays[j * arrayLength + p])
 				if (flag)
@@ -61,26 +66,8 @@ __global__ void cudaHammingDistance2dEquals1(bool *d_arrays, bool *d_pairs, long
 					flag = true;
 		if (flag)
 		{
-			d_pairs[i * numberOfArrays + j] = true;
+			d_pairs[ind] = true;
 		}
-	}
-}
-
-__global__ void cudaHammingDistance2d(bool *d_arrays, unsigned long long *d_distances, long long arrayLength, long long numberOfArrays)
-{
-	const long numThreads = blockDim.x * gridDim.x;
-	const long threadID = blockIdx.x * blockDim.x + threadIdx.x;
-	for (long long ind = threadID; ind < numberOfArrays * numberOfArrays; ind += numThreads)
-	{
-		long long i = ind % numberOfArrays;
-		long long j = ind / numberOfArrays;
-		if (i == j)
-			continue;
-		for (long long p = 0; p < arrayLength; p += 1)
-			if (d_arrays[i * arrayLength + p] != d_arrays[j * arrayLength + p])
-			{
-				d_distances[i * numberOfArrays + j]++;
-			}
 	}
 }
 
@@ -93,14 +80,14 @@ __host__ unsigned int simplerand(void) {
 	return (m_z << 16) + m_w;
 }
 
-__host__ void ShowCpuResults(bool *distances, bool *bitArrays, long long arrayLength, long long numberOfArrays)
+__host__ void ShowCpuResults(bool *pairs, bool *bitArrays, long long arrayLength, long long numberOfArrays)
 {
 	long long pairCount = 0;
 	cout << "All pairs:\n";
 	for (long long i = 0; i < numberOfArrays; i++)
 		for (long long j = 0; j < numberOfArrays; j++)
 		{
-			if (distances[i * numberOfArrays + j])
+			if (pairs[i * numberOfArrays + j])
 			{
 				if (pairCount++ > 0)
 					cout << ", ";
@@ -110,57 +97,59 @@ __host__ void ShowCpuResults(bool *distances, bool *bitArrays, long long arrayLe
 	cout << "\nPair count: " << pairCount << "\n";
 }
 
-__host__ void ShowGpuResults(bool *distances, bool *bitArrays, long long arrayLength, long long numberOfArrays)
+__host__ void ShowGpuResults(bool *pairs, bool *bitArrays, long long arrayLength, long long numberOfArrays)
 {
 	long pairCount = 0;
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	if (SHOW_DIFFS)
 	{
-		for (long long i = 0; i < numberOfArrays; i++)
-			for (long long j = 0; j < numberOfArrays; j++)
-			{
-				if (distances[i * numberOfArrays + j])
-				{
-					cout << "Pair: (" << i << ", " << j << ")\n";
-
-					for (long long ind = 0; ind < arrayLength; ind++)
-					{
-						if (bitArrays[i * arrayLength + ind] == bitArrays[j * arrayLength + ind])
-							cout << bitArrays[i * arrayLength + ind];
-						else
-						{
-							SetConsoleTextAttribute(hConsole, 12);
-							cout << bitArrays[i * arrayLength + ind];
-							SetConsoleTextAttribute(hConsole, 7);
-						}
-					}
-					cout << "\n";
-					for (long long ind = 0; ind < arrayLength; ind++)
-					{
-						if (bitArrays[i * arrayLength + ind] == bitArrays[j * arrayLength + ind])
-							cout << bitArrays[j * arrayLength + ind];
-						else
-						{
-							SetConsoleTextAttribute(hConsole, 12);
-							cout << bitArrays[j * arrayLength + ind];
-							SetConsoleTextAttribute(hConsole, 7);
-						}
-					}
-					cout << "\n";
-				}
-			}
-	}
-	cout << "All pairs:\n";
-	for (long long i = 0; i < numberOfArrays; i++)
-		for (long long j = 0; j < numberOfArrays; j++)
+		for (long long ind = 0; ind < numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays; ind++)
 		{
-			if (distances[i * numberOfArrays + j])
+			if (pairs[ind])
 			{
-				if (pairCount++ > 0)
-					cout << ", ";
-				cout << "(" << i << ", " << j << ")";
+				long long i, j;
+				getTriangleArrayCoordinates(ind, i, j);
+				cout << "Pair: (" << i << ", " << j << ")\n";
+
+				for (long long ind2 = 0; ind2 < arrayLength; ind2++)
+				{
+					if (bitArrays[i * arrayLength + ind2] == bitArrays[j * arrayLength + ind2])
+						cout << bitArrays[i * arrayLength + ind2];
+					else
+					{
+						SetConsoleTextAttribute(hConsole, 12);
+						cout << bitArrays[i * arrayLength + ind2];
+						SetConsoleTextAttribute(hConsole, 7);
+					}
+				}
+				cout << "\n";
+				for (long long ind2 = 0; ind2 < arrayLength; ind2++)
+				{
+					if (bitArrays[i * arrayLength + ind2] == bitArrays[j * arrayLength + ind2])
+						cout << bitArrays[j * arrayLength + ind2];
+					else
+					{
+						SetConsoleTextAttribute(hConsole, 12);
+						cout << bitArrays[j * arrayLength + ind2];
+						SetConsoleTextAttribute(hConsole, 7);
+					}
+				}
+				cout << "\n";
 			}
 		}
+	}
+	cout << "All pairs:\n";
+	for (long long ind = 0; ind < numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays; ind++)
+	{
+		if (pairs[ind])
+		{
+			long long i, j;
+			getTriangleArrayCoordinates(ind, i, j);
+			if (pairCount++ > 0)
+				cout << ", ";
+			cout << "(" << i << ", " << j << ")";
+		}
+	}
 	cout << "\nPair count: " << pairCount << "\n";
 
 }
@@ -224,8 +213,8 @@ __host__ void GpuHammingDistance2d(bool *bitArrays, long long arrayLength, long 
 {
 	bool returnFlag = true;
 	bool *d_bitArrays;
-	bool *d_pairs, *pairs = (bool*)malloc(numberOfArrays * numberOfArrays * sizeof(bool));
-	
+	bool *d_pairs, *pairs = (bool*)malloc(numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays * sizeof(bool));
+
 	int blockSize = 1024;      // The launch configurator returned block size 
 	//int minGridSize;    // The minimum grid size needed to achieve the maximum occupancy for a full device launch 
 	int gridSize = 1024;       // The actual grid size needed, based on input size 
@@ -235,8 +224,8 @@ __host__ void GpuHammingDistance2d(bool *bitArrays, long long arrayLength, long 
 	//cudaMemGetInfo(&free, &total);
 	auto start = chrono::high_resolution_clock::now();
 	CUDA_CALL(cudaMalloc((void**)&d_bitArrays, numberOfArrays * arrayLength * sizeof(bool)));
-	CUDA_CALL(cudaMalloc((void**)&d_pairs, numberOfArrays * numberOfArrays * sizeof(bool)));
-	CUDA_CALL(cudaMemset(d_pairs, 0, numberOfArrays * numberOfArrays));
+	CUDA_CALL(cudaMalloc((void**)&d_pairs, numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays * sizeof(bool)));
+	CUDA_CALL(cudaMemset(d_pairs, 0, numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays));
 	CUDA_CALL(cudaMemcpy(d_bitArrays, bitArrays, numberOfArrays * arrayLength * sizeof(bool), cudaMemcpyHostToDevice));
 
 	//CUDA_CALL(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, cudaHammingDistance2dEquals1, 0, M * M));
@@ -250,14 +239,14 @@ __host__ void GpuHammingDistance2d(bool *bitArrays, long long arrayLength, long 
 	cout << ">>>>>>GpuHammingDistance2d malloc + H2D time: " << milliseconds.count() << " milliseconds\n";
 	start = chrono::high_resolution_clock::now();
 	CUDA_CALL(cudaDeviceSynchronize());
-	cudaHammingDistance2dEquals1 << <gridSize, blockSize>> > (d_bitArrays, d_pairs, arrayLength, numberOfArrays);
+	cudaHammingDistance2dEquals1 << <gridSize, blockSize >> > (d_bitArrays, d_pairs, arrayLength, numberOfArrays);
 	// Check for any errors launching the kernel
 	CUDA_CALL(cudaPeekAtLastError());
 
 	// cudaDeviceSynchronize waits for the kernel to finish, and returns
 	// any errors encountered during the launch.
 	CUDA_CALL(cudaDeviceSynchronize());
-	CUDA_CALL(cudaMemcpy(pairs, d_pairs, numberOfArrays * numberOfArrays * sizeof(bool), cudaMemcpyDeviceToHost));
+	CUDA_CALL(cudaMemcpy(pairs, d_pairs, numberOfArrays * (numberOfArrays - 1) / 2 + numberOfArrays * sizeof(bool), cudaMemcpyDeviceToHost));
 	CUDA_CALL(cudaFree(d_pairs));
 	CUDA_CALL(cudaFree(d_bitArrays));
 	CUDA_CALL(cudaDeviceReset());
