@@ -23,12 +23,12 @@
 using namespace std;
 
 #define N 80LL //rozmiar ci¹gu binarnergo
-#define M 75000LL //iloœæ tablic binarnyc h
+#define M 80000LL //iloœæ tablic binarnyc h
 #define SHOW_DIFFS true //czy pokazywaæ ró¿nicê miêdzy kolejnymi danymi ci¹gami bitów
 #define SHOW_TIME_DETAILS true //czy pokazywaæ z³o¿one komunikaty przy prezentacji czasu dzia³ania
 #define PERFORMANCE_TESTS false //czy przeprowadziæ testy wydajnoœciowe na CPU i GPU
 
-#define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+#define CUDA_CALL(ans) { gpuAssert((ans), __FILE__, __LINE__, true); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
 {
 	if (code != cudaSuccess)
@@ -253,7 +253,7 @@ __host__ void gpuHammingDistance2d(bool *bitArrays, long long arrayLength, long 
 	CUDA_CALL(cudaDeviceSynchronize());
 	cudaHammingDistance2dEquals1 << <gridSize, blockSize >> > (d_bitArrays, d_pairs, arrayLength, numberOfArrays);
 	// Check for any errors launching the kernel
-	CUDA_CALL(cudaPeekAtLastError());
+	CUDA_CALL(cudaGetLastError());
 
 	// cudaDeviceSynchronize waits for the kernel to finish, and returns
 	// any errors encountered during the launch.
@@ -284,14 +284,17 @@ __host__ void performanceTests()
 	for (int n = 0; n != (sizeof(nArray) / sizeof(*nArray)); n++)
 	{
 
-		cout << "N = " << n << "\n";
+		cout << "\nN = " << nArray[n] << "\n";
 		for (int m = 0; m != (sizeof(mArray) / sizeof(*mArray)); m++)
 		{
-			bool *bitArrays = (bool*)calloc(mArray[m] * nArray[n], sizeof(bool));
+			cout << "\nM = " << mArray[m] << "\n";
+			bool *bitArrays = (bool*)calloc((long long)mArray[m] * nArray[n], sizeof(bool));
 			initializeArrays(bitArrays, nArray[n], mArray[m], true);
+
 			cpuHammingDistance2d(bitArrays, nArray[n], mArray[m]);
 			gpuHammingDistance2d(bitArrays, nArray[n], mArray[m]);
-			delete bitArrays;
+
+			delete bitArrays; 
 		}
 	}
 }
